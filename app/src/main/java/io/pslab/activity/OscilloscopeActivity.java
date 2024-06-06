@@ -26,6 +26,7 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
@@ -1140,7 +1141,7 @@ public class OscilloscopeActivity extends GuideActivity implements View.OnClickL
     public void autoScale() {
         double minY = Double.MAX_VALUE;
         double maxY = Double.MIN_VALUE;
-        double maxPeriod = Double.MIN_VALUE;
+        double maxPeriod = -1 * Double.MIN_VALUE;
         double yRange;
         double yPadding;
         double[] voltage = new double[512];
@@ -1187,14 +1188,18 @@ public class OscilloscopeActivity extends GuideActivity implements View.OnClickL
         }
         yRange = maxY - minY;
         yPadding = yRange * 0.1;
-        if ((maxPeriod * 5) < maxTimebase) {
-            xAxisScale = maxPeriod * 5;
+        if (maxPeriod > 0) {
+            if ((maxPeriod * 5) < maxTimebase) {
+                xAxisScale = maxPeriod * 5;
+            } else {
+                xAxisScale = maxTimebase;
+            }
+            yAxisScale = maxY + yPadding;
+            samples = 512;
+            timeGap = (xAxisScale * 1000.0) / samples;
         } else {
-            xAxisScale = maxTimebase;
+            Toast.makeText(this, getString(R.string.auto_scale_error), Toast.LENGTH_SHORT).show();
         }
-        yAxisScale = maxY + yPadding;
-        samples = 512;
-        timeGap = (xAxisScale * 1000.0) / samples;
     }
 
     public class XYPlotTask extends AsyncTask<String, Void, Void> {

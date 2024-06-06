@@ -10,6 +10,7 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math3.transform.DftNormalization;
 import org.apache.commons.math3.transform.FastFourierTransformer;
 import org.apache.commons.math3.transform.TransformType;
+
 import io.pslab.filters.BandstopFilter;
 import io.pslab.filters.Lfilter;
 
@@ -330,10 +331,27 @@ public class AnalyticsClass {
                 index = i;
             }
         }
-        return frequency[index];
+        double sfm = calculateSfm(amplitudeSpectrum(voltage, samplingInterval, 10).get(1));
+        double sfmThreshold = 0.5;
+        if (sfm > sfmThreshold) {
+            return frequency[index];
+        } else {
+            return -1;
+        }
     }
 
-    public ArrayList<double[]> amplitudeSpectrum(double[] voltage, int samplingInterval, int nHarmonics) {
+    private double calculateSfm(double[] amplitude) {
+        DescriptiveStatistics stats = new DescriptiveStatistics();
+        for (int i = 0; i < amplitude.length; i++) {
+            double value = amplitude[i];
+            if (value != 0) {
+                stats.addValue(value * value);
+            }
+        }
+        return stats.getGeometricMean() / stats.getMean();
+    }
+
+    public ArrayList<double[]> amplitudeSpectrum(double[] voltage, double samplingInterval, int nHarmonics) {
         int voltageLength = voltage.length;
         Complex[] complex;
         double[] amplitude;
