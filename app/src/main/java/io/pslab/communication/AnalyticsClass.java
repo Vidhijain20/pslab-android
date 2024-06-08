@@ -331,24 +331,13 @@ public class AnalyticsClass {
                 index = i;
             }
         }
-        double sfm = calculateSfm(amplitudeSpectrum(voltage, samplingInterval, 10).get(1));
-        double sfmThreshold = 0.5;
-        if (sfm > sfmThreshold) {
+        double noiseThreshold = 0.1;
+        Log.d(AnalyticsClass.class.getName(), "max = " + max);
+        if (max >= noiseThreshold) {
             return frequency[index];
         } else {
             return -1;
         }
-    }
-
-    private double calculateSfm(double[] amplitude) {
-        DescriptiveStatistics stats = new DescriptiveStatistics();
-        for (int i = 0; i < amplitude.length; i++) {
-            double value = amplitude[i];
-            if (value != 0) {
-                stats.addValue(value * value);
-            }
-        }
-        return stats.getGeometricMean() / stats.getMean();
     }
 
     public ArrayList<double[]> amplitudeSpectrum(double[] voltage, double samplingInterval, int nHarmonics) {
