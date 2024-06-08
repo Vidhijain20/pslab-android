@@ -15,8 +15,8 @@ import java.io.IOException;
 public class CommunicationHandler {
 
     private final String TAG = this.getClass().getSimpleName();
-    private static final int PSLAB_VENDOR_ID = 1240;
-    private static final int PSLAB_PRODUCT_ID = 223;
+    private static final int PSLAB_VENDOR_ID = 0x10C4;
+    private static final int PSLAB_PRODUCT_ID = 0xEA60;
 
     private UsbInterface mControlInterface;
     private UsbInterface mDataInterface;
@@ -29,12 +29,12 @@ public class CommunicationHandler {
     private boolean mDtr = false;
     private boolean connected = false, device_found = false;
 
-    private static final int USB_RECIP_INTERFACE = 0x01;
-    private static final int USB_RT_ACM = UsbConstants.USB_TYPE_CLASS | USB_RECIP_INTERFACE;
+    private static final int USB_RECIP_INTERFACE = 0x41;
+    private static final int USB_RT = UsbConstants.USB_TYPE_CLASS | USB_RECIP_INTERFACE;
 
-    private static final int SET_LINE_CODING = 0x20;  // USB CDC 1.1 section 6.2
+    private static final int SET_LINE_CODING = 0x1E;
     private static final int GET_LINE_CODING = 0x21;
-    private static final int SET_CONTROL_LINE_STATE = 0x22;
+    private static final int SET_CONTROL_LINE_STATE = 0x03;
     private static final int SEND_BREAK = 0x23;
 
     private static final int DEFAULT_READ_BUFFER_SIZE = 32 * 1024;
@@ -74,8 +74,8 @@ public class CommunicationHandler {
         }
         mConnection = mUsbManager.openDevice(mUsbDevice);
         Log.d(TAG, "Claiming interfaces, count=" + mUsbDevice.getInterfaceCount());
-        mConnection.controlTransfer(0x21, 0x22, 0x1, 0, null, 0, 0);
-
+        mConnection.controlTransfer(0x41, 0x00, 0x0001, 0, null, 0, 5000);
+        setControlLine();
         mControlInterface = mUsbDevice.getInterface(0);
         Log.d(TAG, "Control interface=" + mControlInterface);
 
@@ -87,7 +87,7 @@ public class CommunicationHandler {
         Log.d(TAG, "Control endpoint direction: " + mControlEndpoint.getDirection());
 
         Log.d(TAG, "Claiming data interface.");
-        mDataInterface = mUsbDevice.getInterface(1);
+        mDataInterface = mUsbDevice.getInterface(0);
         Log.d(TAG, "data interface=" + mDataInterface);
 
         if (!mConnection.claimInterface(mDataInterface, true)) {
@@ -124,7 +124,7 @@ public class CommunicationHandler {
 
     public int read(byte[] dest, int bytesToBeRead, int timeoutMillis) throws IOException {
         int numBytesRead = 0;
-        //synchronized (mReadBufferLock) {
+        synchronized (mReadBufferLock) {
         int readNow;
         Log.v(TAG, "TO read : " + bytesToBeRead);
         int bytesToBeReadTemp = bytesToBeRead;
@@ -142,7 +142,7 @@ public class CommunicationHandler {
                 //Log.v(TAG, "REMAINING: " + bytesToBeRead);
             }
         }
-        //}
+        }
         Log.v("Bytes Read", "" + numBytesRead);
         return numBytesRead;
     }
@@ -154,11 +154,11 @@ public class CommunicationHandler {
         int written = 0;
         while (written < src.length) {
             int writeLength, amtWritten;
-            //synchronized (mWriteBufferLock) {
+            synchronized (mWriteBufferLock) {
             writeLength = Math.min(mWriteBuffer.length, src.length - written);
             // bulk transfer supports offset from API 18
             amtWritten = mConnection.bulkTransfer(mWriteEndpoint, src, written, writeLength, timeoutMillis);
-            //}
+            }
             if (amtWritten < 0) {
                 throw new IOException("Error writing " + writeLength
                         + " bytes at offset " + written + " length=" + src.length);
@@ -175,7 +175,7 @@ public class CommunicationHandler {
         while (written < src.length) {
             final int writeLength;
             final int amtWritten;
-            //synchronized (mWriteBufferLock) {
+            synchronized (mWriteBufferLock) {
             final byte[] writeBuffer;
             writeLength = Math.min(src.length - written, mWriteBuffer.length);
             if (written == 0) {
@@ -186,7 +186,7 @@ public class CommunicationHandler {
                 writeBuffer = mWriteBuffer;
             }
             amtWritten = mConnection.bulkTransfer(mWriteEndpoint, writeBuffer, writeLength, timeoutMillis);
-            //}
+            }
             if (amtWritten <= 0) {
                 throw new IOException("Error writing " + writeLength
                         + " bytes at offset " + written + " length=" + src.length);
@@ -206,22 +206,20 @@ public class CommunicationHandler {
                 (byte) (baudRate & 0xff),
                 (byte) ((baudRate >> 8) & 0xff),
                 (byte) ((baudRate >> 16) & 0xff),
-                (byte) ((baudRate >> 24) & 0xff),
-                (byte) 0,
-                (byte) 0,
-                (byte) 8};
-        sendAcmControlMessage(SET_LINE_CODING, 0, msg);
+                (byte) ((baudRate >> 24) & 0xff)
+        };
+        sendControlMessage(SET_LINE_CODING, 0, msg);
         SystemClock.sleep(100);
         clear();
     }
 
-    private int sendAcmControlMessage(int request, int value, byte[] buf) {
-        return mConnection.controlTransfer(USB_RT_ACM, request, value, 0, buf, buf != null ? buf.length : 0, 5000);
+    private int sendControlMessage(int request, int value, byte[] buf) {
+        return mConnection.controlTransfer(USB_RT, request, value, 0, buf, buf != null ? buf.length : 0, 5000);
     }
 
-    public void setDtrRts() {
-        int value = (mRts ? 0x2 : 0) | (mDtr ? 0x1 : 0);
-        sendAcmControlMessage(SET_CONTROL_LINE_STATE, value, null);
+    public void setControlLine() {
+        int value = 0x0800;
+        sendControlMessage(SET_CONTROL_LINE_STATE, value, null);
     }
 
 }
